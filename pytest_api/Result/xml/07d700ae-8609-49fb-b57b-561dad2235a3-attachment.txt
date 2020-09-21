@@ -1,0 +1,5 @@
+[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/save...method:post...cookie:<RequestsCookieJar[<Cookie SESSION=5785e58f-07c1-44cb-8ac6-479b4e226b11 for .eslink.net.cn/>]>...data:{'octId': '', 'priceScope': '', 'costName': '啦啦啦248', 'costType': '9', 'costItem': '91', 'price': '249', 'unit': '元'}...header:{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36', 'Content-Type': 'application/json;charset=UTF-8'}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[{'${oct_id}': "SELECT oct_id FROM other_cost_type WHERE cost_name = '啦啦啦248'"}]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果20200919102318828160591107

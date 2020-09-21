@@ -1,0 +1,6 @@
+[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/deleteAddrCode...method:post...cookie:<RequestsCookieJar[<Cookie SHAREJSESSIONID=a94c202a-5120-40ac-98de-9f49ddcdb505 for gxcr.etbc-enesys.eslink.net.cn/>]>...data:addrCodeId=110101014...header:{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句["SELECT * FROM address_code where addr_code_des ='777'"]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果None
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确

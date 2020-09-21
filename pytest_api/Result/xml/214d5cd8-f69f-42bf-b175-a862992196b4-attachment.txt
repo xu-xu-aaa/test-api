@@ -1,0 +1,6 @@
+[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/delete/20200919151700883969545457...method:post...cookie:<RequestsCookieJar[<Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/>]>...data:None...header:{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36', 'Content-Type': 'application/json;charset=UTF-8'}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句["SELECT * FROM other_cost_type WHERE oct_id = '20200919151700883969545457'"]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果None
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确

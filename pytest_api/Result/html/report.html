@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>report.html</h1>
+    <p>Report generated on 19-Sep-2020 at 15:17:27 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files\Java\jdk1.8.0_131</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.9.0", "pytest": "6.0.1"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.18362-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.8.18", "forked": "1.3.0", "html": "2.1.1", "metadata": "1.10.0", "ordering": "0.6", "parallel": "0.1.0", "repeat": "0.8.0", "rerunfailures": "9.1", "xdist": "2.1.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.8.5</td></tr></table>
+    <h2>Summary</h2>
+    <p>22 tests ran in 10.55 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">18 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">4 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>, <input checked="true" class="filter" data-test-result="rerun" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="rerun">0 rerun</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api2[item1]</td>
+          <td class="col-duration">0.59</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">[gw1] win32 -- Python 3.8.5 c:\python\python38\python.exe<br/><br/>self = &lt;TestCase.Test_Case2.Test_case1 object at 0x0000011BB4DDE310&gt;<br/>item = {&#x27;assertion&#x27;: &#x27;操作成功&#x27;, &#x27;case_id&#x27;: 2, &#x27;data&#x27;: &#x27;town=110101&amp;street=&amp;subdistrict=&amp;codeDesc=${product_name1}&amp;pinyinCode=&amp;addrCodeLng=&amp;addrCodeLat=&amp;SelectType=1&amp;remark=&amp;codeLevel=4&amp;parentCodeId=110101&#x27;, &#x27;header&#x27;: &#x27;form&#x27;, ...}<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, Case().get_case(test_path, el[2]))<br/>    def test_api2(self, item):<br/>&gt;       Common_Testcase().Testcase(sheet_name=el[2], url=item[&quot;url&quot;], data=item[&quot;data&quot;],<br/>                                   assertion=item[&quot;assertion&quot;],<br/>                                   regular=item[&quot;regular&quot;], sql=item[&quot;sql&quot;], sql_assertion=item[&quot;sql_assertion&quot;],<br/>                                   case_id=item[&quot;case_id&quot;], header=item[&quot;header&quot;], method=item[&quot;method&quot;], case_list=[])<br/><br/>TestCase\Test_Case2.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>Common\Common_testcase.py:21: in Testcase<br/>    Response_Assertion().assertion(response_data=response_data, case_id=case_id, case_list=case_list,<br/>Common\Response_assertion.py:19: in assertion<br/>    raise e<br/>Common\Response_assertion.py:13: in assertion<br/>    unittest.TestCase().assertIn(str(assertion), response_data)<br/>c:\python\python38\lib\unittest\case.py:1179: in assertIn<br/>    self.fail(self._formatMessage(msg, standardMsg))<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;unittest.case.TestCase testMethod=runTest&gt;, msg = &#x27;\&#x27;操作成功\&#x27; not found in \&#x27;{&quot;returnCode&quot;:&quot;1111&quot;,&quot;returnMessage&quot;:&quot;地址描述已存在，请修改！&quot;}\&#x27;&#x27;<br/><br/>    def fail(self, msg=None):<br/>        &quot;&quot;&quot;Fail immediately, with the given message.&quot;&quot;&quot;<br/>&gt;       raise self.failureException(msg)<br/><span class="error">E       AssertionError: &#x27;操作成功&#x27; not found in &#x27;{&quot;returnCode&quot;:&quot;1111&quot;,&quot;returnMessage&quot;:&quot;地址描述已存在，请修改！&quot;}&#x27;</span><br/><br/>c:\python\python38\lib\unittest\case.py:753: AssertionError<br/> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/insertAddrCode...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SESSION=b3c080b7-c14a-4bea-87ed-4bd99d3e800e for .eslink.net.cn/&gt;]&gt;...data:town=110101&amp;street=&amp;subdistrict=&amp;codeDesc=888888&amp;pinyinCode=&amp;addrCodeLng=&amp;addrCodeLat=&amp;SelectType=1&amp;remark=&amp;codeLevel=4&amp;parentCodeId=110101...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[31m[1mERROR   [0m case_log:Log.py:19 断言错误&#x27;操作成功&#x27; not found in &#x27;{&quot;returnCode&quot;:&quot;1111&quot;,&quot;returnMessage&quot;:&quot;地址描述已存在，请修改！&quot;}&#x27;<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api2[item2]</td>
+          <td class="col-duration">0.36</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">[gw1] win32 -- Python 3.8.5 c:\python\python38\python.exe<br/><br/>self = &lt;TestCase.Test_Case2.Test_case1 object at 0x0000011BB4C849A0&gt;<br/>item = {&#x27;assertion&#x27;: &#x27;${product_name1}&#x27;, &#x27;case_id&#x27;: 3, &#x27;data&#x27;: &#x27;draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bn...lue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA&#x27;, &#x27;header&#x27;: &#x27;form&#x27;, ...}<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, Case().get_case(test_path, el[2]))<br/>    def test_api2(self, item):<br/>&gt;       Common_Testcase().Testcase(sheet_name=el[2], url=item[&quot;url&quot;], data=item[&quot;data&quot;],<br/>                                   assertion=item[&quot;assertion&quot;],<br/>                                   regular=item[&quot;regular&quot;], sql=item[&quot;sql&quot;], sql_assertion=item[&quot;sql_assertion&quot;],<br/>                                   case_id=item[&quot;case_id&quot;], header=item[&quot;header&quot;], method=item[&quot;method&quot;], case_list=[])<br/><br/>TestCase\Test_Case2.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>Common\Common_testcase.py:21: in Testcase<br/>    Response_Assertion().assertion(response_data=response_data, case_id=case_id, case_list=case_list,<br/>Common\Response_assertion.py:19: in assertion<br/>    raise e<br/>Common\Response_assertion.py:13: in assertion<br/>    unittest.TestCase().assertIn(str(assertion), response_data)<br/>c:\python\python38\lib\unittest\case.py:1179: in assertIn<br/>    self.fail(self._formatMessage(msg, standardMsg))<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;unittest.case.TestCase testMethod=runTest&gt;<br/>msg = &#x27;\&#x27;888888\&#x27; not found in \&#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4...NC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}\&#x27;&#x27;<br/><br/>    def fail(self, msg=None):<br/>        &quot;&quot;&quot;Fail immediately, with the given message.&quot;&quot;&quot;<br/>&gt;       raise self.failureException(msg)<br/><span class="error">E       AssertionError: &#x27;888888&#x27; not found in &#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4&quot;,&quot;addrCodeDes&quot;:&quot;东城区批量开户&quot;,&quot;nodeName&quot;:null,&quot;pinyinCode&quot;:null,&quot;addrCodeLng&quot;:116.395780,&quot;addrCodeLat&quot;:39.932173,&quot;tenantId&quot;:&quot;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}&#x27;</span><br/><br/>c:\python\python38\lib\unittest\case.py:753: AssertionError<br/> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例3
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dccf8155-4ef1-485a-91f8-5ab236634fc3 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bname%5D=addrCodeId&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=addrCodeDes&amp;columns%5B1%5D%5Bname%5D=addrCodeDes&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=addrCodeLevel&amp;columns%5B2%5D%5Bname%5D=addrCodeLevel&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=addrCodeLng&amp;columns%5B3%5D%5Bname%5D=addrCodeLng&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=addrCodeLat&amp;columns%5B4%5D%5Bname%5D=addrCodeLat&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=desc&amp;start=0&amp;length=10&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[31m[1mERROR   [0m case_log:Log.py:19 断言错误&#x27;888888&#x27; not found in &#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4&quot;,&quot;addrCodeDes&quot;:&quot;东城区批量开户&quot;,&quot;nodeName&quot;:null,&quot;pinyinCode&quot;:null,&quot;addrCodeLng&quot;:116.395780,&quot;addrCodeLat&quot;:39.932173,&quot;tenantId&quot;:&quot;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}&#x27;<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api2[item3]</td>
+          <td class="col-duration">0.36</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">[gw1] win32 -- Python 3.8.5 c:\python\python38\python.exe<br/><br/>self = &lt;TestCase.Test_Case2.Test_case1 object at 0x0000011BB4D70100&gt;<br/>item = {&#x27;assertion&#x27;: &#x27;${product_name1}&#x27;, &#x27;case_id&#x27;: 4, &#x27;data&#x27;: &#x27;draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bn...lue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA&#x27;, &#x27;header&#x27;: &#x27;form&#x27;, ...}<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, Case().get_case(test_path, el[2]))<br/>    def test_api2(self, item):<br/>&gt;       Common_Testcase().Testcase(sheet_name=el[2], url=item[&quot;url&quot;], data=item[&quot;data&quot;],<br/>                                   assertion=item[&quot;assertion&quot;],<br/>                                   regular=item[&quot;regular&quot;], sql=item[&quot;sql&quot;], sql_assertion=item[&quot;sql_assertion&quot;],<br/>                                   case_id=item[&quot;case_id&quot;], header=item[&quot;header&quot;], method=item[&quot;method&quot;], case_list=[])<br/><br/>TestCase\Test_Case2.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>Common\Common_testcase.py:21: in Testcase<br/>    Response_Assertion().assertion(response_data=response_data, case_id=case_id, case_list=case_list,<br/>Common\Response_assertion.py:19: in assertion<br/>    raise e<br/>Common\Response_assertion.py:13: in assertion<br/>    unittest.TestCase().assertIn(str(assertion), response_data)<br/>c:\python\python38\lib\unittest\case.py:1179: in assertIn<br/>    self.fail(self._formatMessage(msg, standardMsg))<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>self = &lt;unittest.case.TestCase testMethod=runTest&gt;<br/>msg = &#x27;\&#x27;888888\&#x27; not found in \&#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4...NC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}\&#x27;&#x27;<br/><br/>    def fail(self, msg=None):<br/>        &quot;&quot;&quot;Fail immediately, with the given message.&quot;&quot;&quot;<br/>&gt;       raise self.failureException(msg)<br/><span class="error">E       AssertionError: &#x27;888888&#x27; not found in &#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4&quot;,&quot;addrCodeDes&quot;:&quot;东城区批量开户&quot;,&quot;nodeName&quot;:null,&quot;pinyinCode&quot;:null,&quot;addrCodeLng&quot;:116.395780,&quot;addrCodeLat&quot;:39.932173,&quot;tenantId&quot;:&quot;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}&#x27;</span><br/><br/>c:\python\python38\lib\unittest\case.py:753: AssertionError<br/> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例4
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dccf8155-4ef1-485a-91f8-5ab236634fc3 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bname%5D=addrCodeId&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=addrCodeDes&amp;columns%5B1%5D%5Bname%5D=addrCodeDes&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=addrCodeLevel&amp;columns%5B2%5D%5Bname%5D=addrCodeLevel&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=addrCodeLng&amp;columns%5B3%5D%5Bname%5D=addrCodeLng&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=addrCodeLat&amp;columns%5B4%5D%5Bname%5D=addrCodeLat&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=desc&amp;start=0&amp;length=10&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[31m[1mERROR   [0m case_log:Log.py:19 断言错误&#x27;888888&#x27; not found in &#x27;{&quot;recordsFiltered&quot;:1,&quot;data&quot;:[{&quot;addrCodeId&quot;:&quot;110101013&quot;,&quot;codeId&quot;:&quot;110101&quot;,&quot;addrCodeLevel&quot;:&quot;4&quot;,&quot;addrCodeDes&quot;:&quot;东城区批量开户&quot;,&quot;nodeName&quot;:null,&quot;pinyinCode&quot;:null,&quot;addrCodeLng&quot;:116.395780,&quot;addrCodeLat&quot;:39.932173,&quot;tenantId&quot;:&quot;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&quot;,&quot;orgId&quot;:&quot;075703&quot;,&quot;openCustFeePrice&quot;:null,&quot;remark&quot;:null,&quot;telphone&quot;:null}],&quot;draw&quot;:3,&quot;recordsTotal&quot;:1}&#x27;<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api2[item4]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">[gw1] win32 -- Python 3.8.5 c:\python\python38\python.exe<br/><br/>self = &lt;TestCase.Test_Case2.Test_case1 object at 0x0000011BB4CC9C40&gt;<br/>item = {&#x27;assertion&#x27;: &#x27;true&#x27;, &#x27;case_id&#x27;: 5, &#x27;data&#x27;: &#x27;addrCodeId=${addrCodeId}&#x27;, &#x27;header&#x27;: &#x27;form&#x27;, ...}<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, Case().get_case(test_path, el[2]))<br/>    def test_api2(self, item):<br/>&gt;       Common_Testcase().Testcase(sheet_name=el[2], url=item[&quot;url&quot;], data=item[&quot;data&quot;],<br/>                                   assertion=item[&quot;assertion&quot;],<br/>                                   regular=item[&quot;regular&quot;], sql=item[&quot;sql&quot;], sql_assertion=item[&quot;sql_assertion&quot;],<br/>                                   case_id=item[&quot;case_id&quot;], header=item[&quot;header&quot;], method=item[&quot;method&quot;], case_list=[])<br/><br/>TestCase\Test_Case2.py:26: <br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/>Common\Common_testcase.py:17: in Testcase<br/>    res = Http_Request().http_request(header=header, method=method)<br/>Common\Http_request.py:36: in http_request<br/>    res = self.request_data(url=getattr(get_data, &quot;url&quot;), method=method,<br/>Common\Http_request.py:29: in request_data<br/>    raise e<br/>Common\Http_request.py:26: in request_data<br/>    el = requests.request(method=method, url=url, data=data, cookies=cookie, headers=header, verify=&quot;False&quot;)<br/>c:\python\python38\lib\site-packages\requests\api.py:61: in request<br/>    return session.request(method=method, url=url, **kwargs)<br/>c:\python\python38\lib\site-packages\requests\sessions.py:530: in request<br/>    resp = self.send(prep, **send_kwargs)<br/>c:\python\python38\lib\site-packages\requests\sessions.py:643: in send<br/>    r = adapter.send(request, **kwargs)<br/>c:\python\python38\lib\site-packages\requests\adapters.py:439: in send<br/>    resp = conn.urlopen(<br/>c:\python\python38\lib\site-packages\urllib3\connectionpool.py:670: in urlopen<br/>    httplib_response = self._make_request(<br/>c:\python\python38\lib\site-packages\urllib3\connectionpool.py:392: in _make_request<br/>    conn.request(method, url, **httplib_request_kw)<br/>c:\python\python38\lib\http\client.py:1255: in request<br/>    self._send_request(method, url, body, headers, encode_chunked)<br/>c:\python\python38\lib\http\client.py:1300: in _send_request<br/>    body = _encode(body, &#x27;body&#x27;)<br/>_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ <br/><br/>data = &quot;addrCodeId={&#x27;startMeterNum&#x27;: &#x27;&#x27;, &#x27;gasEnvironment&#x27;: &#x27;&#x27;, &#x27;line&#x27;: 1, &#x27;userNo&#x27;: &#x27;&#x27;, &#x27;meterRange&#x27;: &#x27;&#x27;, &#x27;useYears&#x27;: &#x27;&#x27;, &#x27;re...nufactureDate&#x27;: &#x27;&#x27;, &#x27;addrId&#x27;: &#x27;202008281025046110102211782734&#x27;, &#x27;meterModelDes&#x27;: &#x27;&#x27;, &#x27;manuId&#x27;: &#x27;&#x27;, &#x27;meterModelId&#x27;: &#x27;&#x27;}&quot;<br/>name = &#x27;body&#x27;<br/><br/>    def _encode(data, name=&#x27;data&#x27;):<br/>        &quot;&quot;&quot;Call data.encode(&quot;latin-1&quot;) but show a better error message.&quot;&quot;&quot;<br/>        try:<br/>            return data.encode(&quot;latin-1&quot;)<br/>        except UnicodeEncodeError as err:<br/>&gt;           raise UnicodeEncodeError(<br/>                err.encoding,<br/>                err.object,<br/>                err.start,<br/>                err.end,<br/>                &quot;%s (%.20r) is not valid Latin-1. Use %s.encode(&#x27;utf-8&#x27;) &quot;<br/>                &quot;if you want to send it encoded in UTF-8.&quot; %<br/>                (name.title(), data[err.start:err.end], name)) from None<br/><span class="error">E           UnicodeEncodeError: &#x27;latin-1&#x27; codec can&#x27;t encode characters in position 146-147: Body (&#x27;待用&#x27;) is not valid Latin-1. Use body.encode(&#x27;utf-8&#x27;) if you want to send it encoded in UTF-8.</span><br/><br/>c:\python\python38\lib\http\client.py:164: UnicodeEncodeError<br/> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/deleteAddrCode...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dccf8155-4ef1-485a-91f8-5ab236634fc3 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:addrCodeId={&#x27;startMeterNum&#x27;: &#x27;&#x27;, &#x27;gasEnvironment&#x27;: &#x27;&#x27;, &#x27;line&#x27;: 1, &#x27;userNo&#x27;: &#x27;&#x27;, &#x27;meterRange&#x27;: &#x27;&#x27;, &#x27;useYears&#x27;: &#x27;&#x27;, &#x27;remark&#x27;: &#x27;&#x27;, &#x27;addrStatusDes&#x27;: &#x27;待用&#x27;, &#x27;installPosition&#x27;: &#x27;&#x27;, &#x27;fixedWay&#x27;: &#x27;&#x27;, &#x27;plugCardDirection&#x27;: &#x27;&#x27;, &#x27;installDate&#x27;: &#x27;&#x27;, &#x27;addrDes&#x27;: &#x27;东城区批量开户开户01栋1单元01层101号&#x27;, &#x27;meterType&#x27;: &#x27;&#x27;, &#x27;gasDirection&#x27;: &#x27;&#x27;, &#x27;meterCartonNo&#x27;: &#x27;&#x27;, &#x27;meterNo&#x27;: &#x27;&#x27;, &#x27;manufactureDate&#x27;: &#x27;&#x27;, &#x27;addrId&#x27;: &#x27;202008281025046110102211782734&#x27;, &#x27;meterModelDes&#x27;: &#x27;&#x27;, &#x27;manuId&#x27;: &#x27;&#x27;, &#x27;meterModelId&#x27;: &#x27;&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[31m[1mERROR   [0m case_log:Log.py:19 post请求方式有误：&#x27;latin-1&#x27; codec can&#x27;t encode characters in position 146-147: Body (&#x27;待用&#x27;) is not valid Latin-1. Use body.encode(&#x27;utf-8&#x27;) if you want to send it encoded in UTF-8.<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item0]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例1
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://etbc.hw-qa.eslink.net.cn/user/login...method:post...cookie:None...data:{&#x27;loginName&#x27;: &#x27;1Z9hfs2JSahBUND7GsIet4smPGQ6LB6qozn5jKwMIVsqdA88SWqAjaL5BpKrH7OiuaKIj2fU/B/dK6ango4KzrajEecxsh+7O/jo2ad0q+zuI3a0na3rMdcyvOrlnkVcK+i9lfFGGYZqB3ZwVtVq4H+YG9sfOqxpdHfkIh/Cynz0W91vwiDmh/RngRXR40hMd6Oa/y6NuX6ib9GPTflteFE0YrnBJUdUlv7ayF2BOB/uq0WGTrvq7rgssmB2CoNY1VAzEvLw0CXusrrjhiZlPP03/Xsib1qH9SbV2d9iQXW3+MnIm560LQe8uUyYVc7bkdYSSSwBNBMg8ujDfgx1XA==&#x27;, &#x27;loginPwd&#x27;: &#x27;ygmx92b09cqjgntn9KD528dpZIsCxuU4ev7gqTVd1nMusQ7Kmrpn4f7TpWstvSVR2NyDN24GEcTp7wky6FVYzBKJ5CeRGT8vgjFEGXhCmfjKqYhPSSjwfMS30JnaeK9KxjMpvX8oK9+9PH3ysPB8iMRWQu3MqJ+Kb2tFHJBRqR/P6xFanRB5I+Ty5fnk4YHpFAO52x4YPLmtylLoey02PoL15MrPFMpKEIVitC+CmlROIEmwYPU8fjV+n4jSrAhrz2VmdPLzEqoLzAREEup76jn4M9U4bbKuXD9z3XVIoaFjSyQdq4/SiHB7WyKBP8fmW6WbYzBr37mLEg1rwfHmXg==&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item0]</td>
+          <td class="col-duration">0.29</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例1
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://etbc.hw-qa.eslink.net.cn/user/login...method:post...cookie:None...data:{&#x27;loginName&#x27;: &#x27;1Z9hfs2JSahBUND7GsIet4smPGQ6LB6qozn5jKwMIVsqdA88SWqAjaL5BpKrH7OiuaKIj2fU/B/dK6ango4KzrajEecxsh+7O/jo2ad0q+zuI3a0na3rMdcyvOrlnkVcK+i9lfFGGYZqB3ZwVtVq4H+YG9sfOqxpdHfkIh/Cynz0W91vwiDmh/RngRXR40hMd6Oa/y6NuX6ib9GPTflteFE0YrnBJUdUlv7ayF2BOB/uq0WGTrvq7rgssmB2CoNY1VAzEvLw0CXusrrjhiZlPP03/Xsib1qH9SbV2d9iQXW3+MnIm560LQe8uUyYVc7bkdYSSSwBNBMg8ujDfgx1XA==&#x27;, &#x27;loginPwd&#x27;: &#x27;ygmx92b09cqjgntn9KD528dpZIsCxuU4ev7gqTVd1nMusQ7Kmrpn4f7TpWstvSVR2NyDN24GEcTp7wky6FVYzBKJ5CeRGT8vgjFEGXhCmfjKqYhPSSjwfMS30JnaeK9KxjMpvX8oK9+9PH3ysPB8iMRWQu3MqJ+Kb2tFHJBRqR/P6xFanRB5I+Ty5fnk4YHpFAO52x4YPLmtylLoey02PoL15MrPFMpKEIVitC+CmlROIEmwYPU8fjV+n4jSrAhrz2VmdPLzEqoLzAREEup76jn4M9U4bbKuXD9z3XVIoaFjSyQdq4/SiHB7WyKBP8fmW6WbYzBr37mLEg1rwfHmXg==&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item1]</td>
+          <td class="col-duration">0.73</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/save...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SESSION=5785e58f-07c1-44cb-8ac6-479b4e226b11 for .eslink.net.cn/&gt;]&gt;...data:{&#x27;octId&#x27;: &#x27;&#x27;, &#x27;priceScope&#x27;: &#x27;&#x27;, &#x27;costName&#x27;: &#x27;啦啦啦248&#x27;, &#x27;costType&#x27;: &#x27;9&#x27;, &#x27;costItem&#x27;: &#x27;91&#x27;, &#x27;price&#x27;: &#x27;249&#x27;, &#x27;unit&#x27;: &#x27;元&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[{&#x27;${oct_id}&#x27;: &quot;SELECT oct_id FROM other_cost_type WHERE cost_name = &#x27;啦啦啦248&#x27;&quot;}]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果20200919102318828160591107<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item2]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例3
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dcf4ae42-22ff-4520-96c1-d52a442b04d2 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=2&amp;columns%5B0%5D%5Bdata%5D=costName&amp;columns%5B0%5D%5Bname%5D=&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=costItemDes&amp;columns%5B1%5D%5Bname%5D=&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=price&amp;columns%5B2%5D%5Bname%5D=&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=unit&amp;columns%5B3%5D%5Bname%5D=&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=createTime&amp;columns%5B4%5D%5Bname%5D=&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B5%5D%5Bdata%5D=corpDesc&amp;columns%5B5%5D%5Bname%5D=&amp;columns%5B5%5D%5Bsearchable%5D=true&amp;columns%5B5%5D%5Borderable%5D=true&amp;columns%5B5%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B5%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B6%5D%5Bdata%5D=stateDes&amp;columns%5B6%5D%5Bname%5D=&amp;columns%5B6%5D%5Bsearchable%5D=true&amp;columns%5B6%5D%5Borderable%5D=true&amp;columns%5B6%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B6%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=asc&amp;start=0&amp;length=18&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item1]</td>
+          <td class="col-duration">2.38</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/save...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SESSION=a4db6f28-e89b-4a55-b155-dec0c08c8177 for .eslink.net.cn/&gt;]&gt;...data:{&#x27;octId&#x27;: &#x27;&#x27;, &#x27;priceScope&#x27;: &#x27;&#x27;, &#x27;costName&#x27;: &#x27;啦啦啦248&#x27;, &#x27;costType&#x27;: &#x27;9&#x27;, &#x27;costItem&#x27;: &#x27;91&#x27;, &#x27;price&#x27;: &#x27;249&#x27;, &#x27;unit&#x27;: &#x27;元&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[{&#x27;${oct_id}&#x27;: &quot;SELECT oct_id FROM other_cost_type WHERE cost_name = &#x27;啦啦啦248&#x27;&quot;}]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果20200919151700883969545457<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item2]</td>
+          <td class="col-duration">0.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例3
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=2&amp;columns%5B0%5D%5Bdata%5D=costName&amp;columns%5B0%5D%5Bname%5D=&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=costItemDes&amp;columns%5B1%5D%5Bname%5D=&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=price&amp;columns%5B2%5D%5Bname%5D=&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=unit&amp;columns%5B3%5D%5Bname%5D=&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=createTime&amp;columns%5B4%5D%5Bname%5D=&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B5%5D%5Bdata%5D=corpDesc&amp;columns%5B5%5D%5Bname%5D=&amp;columns%5B5%5D%5Bsearchable%5D=true&amp;columns%5B5%5D%5Borderable%5D=true&amp;columns%5B5%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B5%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B6%5D%5Bdata%5D=stateDes&amp;columns%5B6%5D%5Bname%5D=&amp;columns%5B6%5D%5Bsearchable%5D=true&amp;columns%5B6%5D%5Borderable%5D=true&amp;columns%5B6%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B6%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=asc&amp;start=0&amp;length=18&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item3]</td>
+          <td class="col-duration">0.47</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例4
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/save...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:{&#x27;octId&#x27;: &#x27;20200919151700883969545457&#x27;, &#x27;priceScope&#x27;: &#x27;&#x27;, &#x27;costName&#x27;: &#x27;你好啊&#x27;, &#x27;costType&#x27;: &#x27;9&#x27;, &#x27;costItem&#x27;: &#x27;91&#x27;, &#x27;price&#x27;: &#x27;248&#x27;, &#x27;unit&#x27;: &#x27;元&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[{&#x27;${variable2}&#x27;: &quot;SELECT oct_id FROM other_cost_type WHERE cost_name = &#x27;你好啊&#x27;&quot;}, &quot;SELECT * FROM other_cost_type WHERE cost_name = &#x27;你好啊&#x27;&quot;, &quot;SELECT * FROM other_cost_type WHERE oct_id = &#x27;20200919151700883969545457&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果20200919102318828160591107
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{&#x27;oct_id&#x27;: &#x27;20200919102318828160591107&#x27;, &#x27;cost_name&#x27;: &#x27;你好啊&#x27;, &#x27;price&#x27;: Decimal(&#x27;248.0000&#x27;), &#x27;unit&#x27;: &#x27;元&#x27;, &#x27;cost_type&#x27;: &#x27;9&#x27;, &#x27;cost_item&#x27;: &#x27;91&#x27;, &#x27;state&#x27;: None, &#x27;create_staff_id&#x27;: &#x27;44170&#x27;, &#x27;create_time&#x27;: datetime.datetime(2020, 9, 19, 10, 23, 19), &#x27;modify_staff_id&#x27;: &#x27;44170&#x27;, &#x27;modify_time&#x27;: datetime.datetime(2020, 9, 19, 15, 17, 2), &#x27;corp_id&#x27;: &#x27;2360&#x27;, &#x27;tenant_id&#x27;: &#x27;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&#x27;, &#x27;org_id&#x27;: &#x27;075703&#x27;, &#x27;invoice_type&#x27;: None, &#x27;is_scope&#x27;: &#x27;0&#x27;, &#x27;price_scope&#x27;: None, &#x27;addr_code_id&#x27;: None, &#x27;addr_code_des&#x27;: None, &#x27;cust_type&#x27;: None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{&#x27;oct_id&#x27;: &#x27;20200919151700883969545457&#x27;, &#x27;cost_name&#x27;: &#x27;你好啊&#x27;, &#x27;price&#x27;: Decimal(&#x27;248.0000&#x27;), &#x27;unit&#x27;: &#x27;元&#x27;, &#x27;cost_type&#x27;: &#x27;9&#x27;, &#x27;cost_item&#x27;: &#x27;91&#x27;, &#x27;state&#x27;: None, &#x27;create_staff_id&#x27;: &#x27;44170&#x27;, &#x27;create_time&#x27;: datetime.datetime(2020, 9, 19, 15, 17, 2), &#x27;modify_staff_id&#x27;: &#x27;44170&#x27;, &#x27;modify_time&#x27;: datetime.datetime(2020, 9, 19, 15, 17, 4), &#x27;corp_id&#x27;: &#x27;2360&#x27;, &#x27;tenant_id&#x27;: &#x27;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&#x27;, &#x27;org_id&#x27;: &#x27;075703&#x27;, &#x27;invoice_type&#x27;: None, &#x27;is_scope&#x27;: &#x27;0&#x27;, &#x27;price_scope&#x27;: None, &#x27;addr_code_id&#x27;: None, &#x27;addr_code_des&#x27;: None, &#x27;cust_type&#x27;: None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item3]</td>
+          <td class="col-duration">2.22</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例4
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/save...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dcf4ae42-22ff-4520-96c1-d52a442b04d2 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:{&#x27;octId&#x27;: &#x27;20200919102318828160591107&#x27;, &#x27;priceScope&#x27;: &#x27;&#x27;, &#x27;costName&#x27;: &#x27;你好啊&#x27;, &#x27;costType&#x27;: &#x27;9&#x27;, &#x27;costItem&#x27;: &#x27;91&#x27;, &#x27;price&#x27;: &#x27;248&#x27;, &#x27;unit&#x27;: &#x27;元&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[{&#x27;${variable2}&#x27;: &quot;SELECT oct_id FROM other_cost_type WHERE cost_name = &#x27;你好啊&#x27;&quot;}, &quot;SELECT * FROM other_cost_type WHERE cost_name = &#x27;你好啊&#x27;&quot;, &quot;SELECT * FROM other_cost_type WHERE oct_id = &#x27;20200919102318828160591107&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果20200919102318828160591107
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{&#x27;oct_id&#x27;: &#x27;20200919102318828160591107&#x27;, &#x27;cost_name&#x27;: &#x27;你好啊&#x27;, &#x27;price&#x27;: Decimal(&#x27;248.0000&#x27;), &#x27;unit&#x27;: &#x27;元&#x27;, &#x27;cost_type&#x27;: &#x27;9&#x27;, &#x27;cost_item&#x27;: &#x27;91&#x27;, &#x27;state&#x27;: None, &#x27;create_staff_id&#x27;: &#x27;44170&#x27;, &#x27;create_time&#x27;: datetime.datetime(2020, 9, 19, 10, 23, 19), &#x27;modify_staff_id&#x27;: &#x27;44170&#x27;, &#x27;modify_time&#x27;: datetime.datetime(2020, 9, 19, 15, 17, 2), &#x27;corp_id&#x27;: &#x27;2360&#x27;, &#x27;tenant_id&#x27;: &#x27;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&#x27;, &#x27;org_id&#x27;: &#x27;075703&#x27;, &#x27;invoice_type&#x27;: None, &#x27;is_scope&#x27;: &#x27;0&#x27;, &#x27;price_scope&#x27;: None, &#x27;addr_code_id&#x27;: None, &#x27;addr_code_des&#x27;: None, &#x27;cust_type&#x27;: None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{&#x27;oct_id&#x27;: &#x27;20200919102318828160591107&#x27;, &#x27;cost_name&#x27;: &#x27;你好啊&#x27;, &#x27;price&#x27;: Decimal(&#x27;248.0000&#x27;), &#x27;unit&#x27;: &#x27;元&#x27;, &#x27;cost_type&#x27;: &#x27;9&#x27;, &#x27;cost_item&#x27;: &#x27;91&#x27;, &#x27;state&#x27;: None, &#x27;create_staff_id&#x27;: &#x27;44170&#x27;, &#x27;create_time&#x27;: datetime.datetime(2020, 9, 19, 10, 23, 19), &#x27;modify_staff_id&#x27;: &#x27;44170&#x27;, &#x27;modify_time&#x27;: datetime.datetime(2020, 9, 19, 15, 17, 2), &#x27;corp_id&#x27;: &#x27;2360&#x27;, &#x27;tenant_id&#x27;: &#x27;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&#x27;, &#x27;org_id&#x27;: &#x27;075703&#x27;, &#x27;invoice_type&#x27;: None, &#x27;is_scope&#x27;: &#x27;0&#x27;, &#x27;price_scope&#x27;: None, &#x27;addr_code_id&#x27;: None, &#x27;addr_code_des&#x27;: None, &#x27;cust_type&#x27;: None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item4]</td>
+          <td class="col-duration">0.36</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/delete/20200919151700883969545457...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:None...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[&quot;SELECT * FROM other_cost_type WHERE oct_id = &#x27;20200919151700883969545457&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果None
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item4]</td>
+          <td class="col-duration">0.36</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/otherCostType/delete/20200919102318828160591107...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dcf4ae42-22ff-4520-96c1-d52a442b04d2 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:None...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/json;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[&quot;SELECT * FROM other_cost_type WHERE oct_id = &#x27;20200919102318828160591107&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果None
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api1[item5]</td>
+          <td class="col-duration">0.18</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例6
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/meterBatInstall/importExcel...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dcf4ae42-22ff-4520-96c1-d52a442b04d2 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:&lt;MultipartEncoder: {&#x27;files[]&#x27;: (&#x27;meterInstall.xlsx&#x27;, &lt;_io.BufferedReader name=&#x27;C:\\DDDD\\pytest_api\\Test_Data\\Data\\meterInstall.xlsx&#x27;&gt;, &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27;)}&gt;...header:{&#x27;Content-Type&#x27;: &#x27;multipart/form-data; boundary=------WebKitFormBoundaryPDylsMEaQhk1XpIh&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 正则获取到的变量[{&quot;startMeterNum&quot;:&quot;&quot;,&quot;gasEnvironment&quot;:&quot;&quot;,&quot;line&quot;:1,&quot;userNo&quot;:&quot;&quot;,&quot;meterRange&quot;:&quot;&quot;,&quot;useYears&quot;:&quot;&quot;,&quot;remark&quot;:&quot;&quot;,&quot;addrStatusDes&quot;:&quot;待用&quot;,&quot;installPosition&quot;:&quot;&quot;,&quot;fixedWay&quot;:&quot;&quot;,&quot;plugCardDirection&quot;:&quot;&quot;,&quot;installDate&quot;:&quot;&quot;,&quot;addrDes&quot;:&quot;东城区批量开户开户01栋1单元01层101号&quot;,&quot;meterType&quot;:&quot;&quot;,&quot;gasDirection&quot;:&quot;&quot;,&quot;meterCartonNo&quot;:&quot;&quot;,&quot;meterNo&quot;:&quot;&quot;,&quot;manufactureDate&quot;:&quot;&quot;,&quot;addrId&quot;:&quot;202008281025046110102211782734&quot;,&quot;meterModelDes&quot;:&quot;&quot;,&quot;manuId&quot;:&quot;&quot;,&quot;meterModelId&quot;:&quot;&quot;}]
+[32mINFO    [0m case_log:Log.py:15 正则获取到的变量{&#x27;startMeterNum&#x27;: &#x27;&#x27;, &#x27;gasEnvironment&#x27;: &#x27;&#x27;, &#x27;line&#x27;: 1, &#x27;userNo&#x27;: &#x27;&#x27;, &#x27;meterRange&#x27;: &#x27;&#x27;, &#x27;useYears&#x27;: &#x27;&#x27;, &#x27;remark&#x27;: &#x27;&#x27;, &#x27;addrStatusDes&#x27;: &#x27;待用&#x27;, &#x27;installPosition&#x27;: &#x27;&#x27;, &#x27;fixedWay&#x27;: &#x27;&#x27;, &#x27;plugCardDirection&#x27;: &#x27;&#x27;, &#x27;installDate&#x27;: &#x27;&#x27;, &#x27;addrDes&#x27;: &#x27;东城区批量开户开户01栋1单元01层101号&#x27;, &#x27;meterType&#x27;: &#x27;&#x27;, &#x27;gasDirection&#x27;: &#x27;&#x27;, &#x27;meterCartonNo&#x27;: &#x27;&#x27;, &#x27;meterNo&#x27;: &#x27;&#x27;, &#x27;manufactureDate&#x27;: &#x27;&#x27;, &#x27;addrId&#x27;: &#x27;202008281025046110102211782734&#x27;, &#x27;meterModelDes&#x27;: &#x27;&#x27;, &#x27;manuId&#x27;: &#x27;&#x27;, &#x27;meterModelId&#x27;: &#x27;&#x27;}<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api2[item0]</td>
+          <td class="col-duration">0.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例1
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://etbc.hw-qa.eslink.net.cn/user/login...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=dcf4ae42-22ff-4520-96c1-d52a442b04d2 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:{&#x27;loginName&#x27;: &#x27;1Z9hfs2JSahBUND7GsIet4smPGQ6LB6qozn5jKwMIVsqdA88SWqAjaL5BpKrH7OiuaKIj2fU/B/dK6ango4KzrajEecxsh+7O/jo2ad0q+zuI3a0na3rMdcyvOrlnkVcK+i9lfFGGYZqB3ZwVtVq4H+YG9sfOqxpdHfkIh/Cynz0W91vwiDmh/RngRXR40hMd6Oa/y6NuX6ib9GPTflteFE0YrnBJUdUlv7ayF2BOB/uq0WGTrvq7rgssmB2CoNY1VAzEvLw0CXusrrjhiZlPP03/Xsib1qH9SbV2d9iQXW3+MnIm560LQe8uUyYVc7bkdYSSSwBNBMg8ujDfgx1XA==&#x27;, &#x27;loginPwd&#x27;: &#x27;ygmx92b09cqjgntn9KD528dpZIsCxuU4ev7gqTVd1nMusQ7Kmrpn4f7TpWstvSVR2NyDN24GEcTp7wky6FVYzBKJ5CeRGT8vgjFEGXhCmfjKqYhPSSjwfMS30JnaeK9KxjMpvX8oK9+9PH3ysPB8iMRWQu3MqJ+Kb2tFHJBRqR/P6xFanRB5I+Ty5fnk4YHpFAO52x4YPLmtylLoey02PoL15MrPFMpKEIVitC+CmlROIEmwYPU8fjV+n4jSrAhrz2VmdPLzEqoLzAREEup76jn4M9U4bbKuXD9z3XVIoaFjSyQdq4/SiHB7WyKBP8fmW6WbYzBr37mLEg1rwfHmXg==&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api1[item5]</td>
+          <td class="col-duration">0.60</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例6
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/meterBatInstall/importExcel...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:&lt;MultipartEncoder: {&#x27;files[]&#x27;: (&#x27;meterInstall.xlsx&#x27;, &lt;_io.BufferedReader name=&#x27;C:\\DDDD\\pytest_api\\Test_Data\\Data\\meterInstall.xlsx&#x27;&gt;, &#x27;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&#x27;)}&gt;...header:{&#x27;Content-Type&#x27;: &#x27;multipart/form-data; boundary=------WebKitFormBoundaryPDylsMEaQhk1XpIh&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 正则获取到的变量[{&quot;startMeterNum&quot;:&quot;&quot;,&quot;gasEnvironment&quot;:&quot;&quot;,&quot;line&quot;:1,&quot;userNo&quot;:&quot;&quot;,&quot;meterRange&quot;:&quot;&quot;,&quot;useYears&quot;:&quot;&quot;,&quot;remark&quot;:&quot;&quot;,&quot;addrStatusDes&quot;:&quot;待用&quot;,&quot;installPosition&quot;:&quot;&quot;,&quot;fixedWay&quot;:&quot;&quot;,&quot;plugCardDirection&quot;:&quot;&quot;,&quot;installDate&quot;:&quot;&quot;,&quot;addrDes&quot;:&quot;东城区批量开户开户01栋1单元01层101号&quot;,&quot;meterType&quot;:&quot;&quot;,&quot;gasDirection&quot;:&quot;&quot;,&quot;meterCartonNo&quot;:&quot;&quot;,&quot;meterNo&quot;:&quot;&quot;,&quot;manufactureDate&quot;:&quot;&quot;,&quot;addrId&quot;:&quot;202008281025046110102211782734&quot;,&quot;meterModelDes&quot;:&quot;&quot;,&quot;manuId&quot;:&quot;&quot;,&quot;meterModelId&quot;:&quot;&quot;}]
+[32mINFO    [0m case_log:Log.py:15 正则获取到的变量{&#x27;startMeterNum&#x27;: &#x27;&#x27;, &#x27;gasEnvironment&#x27;: &#x27;&#x27;, &#x27;line&#x27;: 1, &#x27;userNo&#x27;: &#x27;&#x27;, &#x27;meterRange&#x27;: &#x27;&#x27;, &#x27;useYears&#x27;: &#x27;&#x27;, &#x27;remark&#x27;: &#x27;&#x27;, &#x27;addrStatusDes&#x27;: &#x27;待用&#x27;, &#x27;installPosition&#x27;: &#x27;&#x27;, &#x27;fixedWay&#x27;: &#x27;&#x27;, &#x27;plugCardDirection&#x27;: &#x27;&#x27;, &#x27;installDate&#x27;: &#x27;&#x27;, &#x27;addrDes&#x27;: &#x27;东城区批量开户开户01栋1单元01层101号&#x27;, &#x27;meterType&#x27;: &#x27;&#x27;, &#x27;gasDirection&#x27;: &#x27;&#x27;, &#x27;meterCartonNo&#x27;: &#x27;&#x27;, &#x27;meterNo&#x27;: &#x27;&#x27;, &#x27;manufactureDate&#x27;: &#x27;&#x27;, &#x27;addrId&#x27;: &#x27;202008281025046110102211782734&#x27;, &#x27;meterModelDes&#x27;: &#x27;&#x27;, &#x27;manuId&#x27;: &#x27;&#x27;, &#x27;meterModelId&#x27;: &#x27;&#x27;}<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case2.py::Test_case1::test_api2[item0]</td>
+          <td class="col-duration">0.62</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例1
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://etbc.hw-qa.eslink.net.cn/user/login...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=9f0ef2f5-811d-4db6-9bab-e01db9e23839 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:{&#x27;loginName&#x27;: &#x27;1Z9hfs2JSahBUND7GsIet4smPGQ6LB6qozn5jKwMIVsqdA88SWqAjaL5BpKrH7OiuaKIj2fU/B/dK6ango4KzrajEecxsh+7O/jo2ad0q+zuI3a0na3rMdcyvOrlnkVcK+i9lfFGGYZqB3ZwVtVq4H+YG9sfOqxpdHfkIh/Cynz0W91vwiDmh/RngRXR40hMd6Oa/y6NuX6ib9GPTflteFE0YrnBJUdUlv7ayF2BOB/uq0WGTrvq7rgssmB2CoNY1VAzEvLw0CXusrrjhiZlPP03/Xsib1qH9SbV2d9iQXW3+MnIm560LQe8uUyYVc7bkdYSSSwBNBMg8ujDfgx1XA==&#x27;, &#x27;loginPwd&#x27;: &#x27;ygmx92b09cqjgntn9KD528dpZIsCxuU4ev7gqTVd1nMusQ7Kmrpn4f7TpWstvSVR2NyDN24GEcTp7wky6FVYzBKJ5CeRGT8vgjFEGXhCmfjKqYhPSSjwfMS30JnaeK9KxjMpvX8oK9+9PH3ysPB8iMRWQu3MqJ+Kb2tFHJBRqR/P6xFanRB5I+Ty5fnk4YHpFAO52x4YPLmtylLoey02PoL15MrPFMpKEIVitC+CmlROIEmwYPU8fjV+n4jSrAhrz2VmdPLzEqoLzAREEup76jn4M9U4bbKuXD9z3XVIoaFjSyQdq4/SiHB7WyKBP8fmW6WbYzBr37mLEg1rwfHmXg==&#x27;}...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api2[item1]</td>
+          <td class="col-duration">0.89</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/insertAddrCode...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SESSION=4de36c91-d495-4d44-ad96-f2e2ce29c961 for .eslink.net.cn/&gt;]&gt;...data:town=110101&amp;street=&amp;subdistrict=&amp;codeDesc=888888&amp;pinyinCode=&amp;addrCodeLng=&amp;addrCodeLat=&amp;SelectType=1&amp;remark=&amp;codeLevel=4&amp;parentCodeId=110101...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[&quot;SELECT * FROM address_code where addr_code_des =&#x27;888888&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{&#x27;addr_code_id&#x27;: &#x27;110101014&#x27;, &#x27;addr_code_level&#x27;: &#x27;4&#x27;, &#x27;addr_code_des&#x27;: &#x27;888888&#x27;, &#x27;node_name&#x27;: None, &#x27;pinyin_code&#x27;: None, &#x27;addr_code_lng&#x27;: None, &#x27;addr_code_lat&#x27;: None, &#x27;tenant_id&#x27;: &#x27;ITQ8m46H1FpoaC2brNC52vLr06lv24LA&#x27;, &#x27;code_id&#x27;: &#x27;110101&#x27;, &#x27;org_id&#x27;: &#x27;075703&#x27;, &#x27;open_cust_fee_price&#x27;: None, &#x27;remark&#x27;: &#x27;&#x27;, &#x27;telphone&#x27;: None, &#x27;old_data_flag&#x27;: None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api2[item2]</td>
+          <td class="col-duration">0.34</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例3
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=a94c202a-5120-40ac-98de-9f49ddcdb505 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bname%5D=addrCodeId&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=addrCodeDes&amp;columns%5B1%5D%5Bname%5D=addrCodeDes&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=addrCodeLevel&amp;columns%5B2%5D%5Bname%5D=addrCodeLevel&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=addrCodeLng&amp;columns%5B3%5D%5Bname%5D=addrCodeLng&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=addrCodeLat&amp;columns%5B4%5D%5Bname%5D=addrCodeLat&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=desc&amp;start=0&amp;length=10&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api2[item3]</td>
+          <td class="col-duration">0.35</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例4
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/list...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=a94c202a-5120-40ac-98de-9f49ddcdb505 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:draw=3&amp;columns%5B0%5D%5Bdata%5D=addrCodeId&amp;columns%5B0%5D%5Bname%5D=addrCodeId&amp;columns%5B0%5D%5Bsearchable%5D=true&amp;columns%5B0%5D%5Borderable%5D=true&amp;columns%5B0%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B0%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B1%5D%5Bdata%5D=addrCodeDes&amp;columns%5B1%5D%5Bname%5D=addrCodeDes&amp;columns%5B1%5D%5Bsearchable%5D=true&amp;columns%5B1%5D%5Borderable%5D=true&amp;columns%5B1%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B1%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B2%5D%5Bdata%5D=addrCodeLevel&amp;columns%5B2%5D%5Bname%5D=addrCodeLevel&amp;columns%5B2%5D%5Bsearchable%5D=true&amp;columns%5B2%5D%5Borderable%5D=true&amp;columns%5B2%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B2%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B3%5D%5Bdata%5D=addrCodeLng&amp;columns%5B3%5D%5Bname%5D=addrCodeLng&amp;columns%5B3%5D%5Bsearchable%5D=true&amp;columns%5B3%5D%5Borderable%5D=true&amp;columns%5B3%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B3%5D%5Bsearch%5D%5Bregex%5D=false&amp;columns%5B4%5D%5Bdata%5D=addrCodeLat&amp;columns%5B4%5D%5Bname%5D=addrCodeLat&amp;columns%5B4%5D%5Bsearchable%5D=true&amp;columns%5B4%5D%5Borderable%5D=true&amp;columns%5B4%5D%5Bsearch%5D%5Bvalue%5D=&amp;columns%5B4%5D%5Bsearch%5D%5Bregex%5D=false&amp;order%5B0%5D%5Bcolumn%5D=0&amp;order%5B0%5D%5Bdir%5D=desc&amp;start=0&amp;length=10&amp;search%5Bvalue%5D=&amp;search%5Bregex%5D=false&amp;codeVal=110101&amp;codeLevel=4&amp;codeDes=%E4%B8%9C%E5%9F%8E%E5%8C%BA...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 正则获取到的变量110101014<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">TestCase/Test_Case1.py::Test_case1::test_api2[item4]</td>
+          <td class="col-duration">2.13</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>[32mINFO    [0m case_log:Log.py:15 执行的用例5
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/deleteAddrCode...method:post...cookie:&lt;RequestsCookieJar[&lt;Cookie SHAREJSESSIONID=a94c202a-5120-40ac-98de-9f49ddcdb505 for gxcr.etbc-enesys.eslink.net.cn/&gt;]&gt;...data:addrCodeId=110101014...header:{&#x27;User-Agent&#x27;: &#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36&#x27;, &#x27;Content-Type&#x27;: &#x27;application/x-www-form-urlencoded;charset=UTF-8&#x27;}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句[&quot;SELECT * FROM address_code where addr_code_des =&#x27;777&#x27;&quot;]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果None
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确<br/></div></td></tr></tbody></table></body></html>

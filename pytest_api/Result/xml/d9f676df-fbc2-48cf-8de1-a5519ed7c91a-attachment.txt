@@ -1,0 +1,6 @@
+[32mINFO    [0m case_log:Log.py:15 执行的用例2
+[32mINFO    [0m case_log:Log.py:15 请求的入参url:http://gxcr.etbc-enesys.eslink.net.cn/enesys-web/addrCode/insertAddrCode...method:post...cookie:<RequestsCookieJar[<Cookie SESSION=4de36c91-d495-4d44-ad96-f2e2ce29c961 for .eslink.net.cn/>]>...data:town=110101&street=&subdistrict=&codeDesc=888888&pinyinCode=&addrCodeLng=&addrCodeLat=&SelectType=1&remark=&codeLevel=4&parentCodeId=110101...header:{'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.83 Safari/537.36', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'}
+[32mINFO    [0m case_log:Log.py:15 断言正确
+[32mINFO    [0m case_log:Log.py:15 SQL语句["SELECT * FROM address_code where addr_code_des ='888888'"]
+[32mINFO    [0m case_log:Log.py:15 SQL查询结果{'addr_code_id': '110101014', 'addr_code_level': '4', 'addr_code_des': '888888', 'node_name': None, 'pinyin_code': None, 'addr_code_lng': None, 'addr_code_lat': None, 'tenant_id': 'ITQ8m46H1FpoaC2brNC52vLr06lv24LA', 'code_id': '110101', 'org_id': '075703', 'open_cust_fee_price': None, 'remark': '', 'telphone': None, 'old_data_flag': None}
+[32mINFO    [0m case_log:Log.py:15 SQL断言正确
